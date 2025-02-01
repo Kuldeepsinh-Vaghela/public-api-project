@@ -51,3 +51,53 @@ for data in merged_data_list:
 final_df = df_list[0]
 for df in df_list[1:]:
     final_df = final_df.union(df)
+
+expected_schema = StructType(
+    [
+        StructField('id',IntegerType(),False),
+        StructField('date',DateType(),True),
+        StructField('deadline_date',DateType(),True),
+        StructField('title',StringType(),True),
+        StructField('category',StringType(),True),
+        StructField('phase',StringType(),True),
+        StructField('awarded_value_in_euros',LongType(),True)
+    ]
+)
+
+# Data Validation - Schema Validation (Number of columns check)
+def col_count_check(expected_schema,extracted_schema):
+    missing_columns = [col.name for col in expected_schema if col.name not in extracted_schema]
+    extra_columns = [col for col in extracted_schema if col not in [col.name for col in expected_schema]]
+
+    if len(missing_columns) > 0:
+         print(f"You have some missing columns!! - {missing_columns}")
+    elif len(extra_columns) > 0:
+        print(f"You have received some extra columns !!! - {extra_columns} ")
+    else:
+        print("All the required columns are extracted correctly")
+    
+   
+
+col_count_check(expected_schema,final_df.columns)
+
+
+# Casting different datatype to different columns
+
+for x in expected_schema.fields:
+    dtype = x.dataType
+    col_name = x.name
+    final_df = final_df.withColumn(col_name, final_df[col_name].cast(dtype))
+
+    # Replacing null values with default value
+
+# replacing null values in deadline date column
+final_df = final_df.withColumn('deadline_date', coalesce(final_df['deadline_date'], lit('9999-99-9')))
+
+# replacing null vlaues in other columns
+final_df = final_df.na.fill('unknown',['phase'])\
+    .na.fill(value = 0, subset=['awarded_value_in_euros'])
+
+# counting null values in different columns of dataframe
+
+null_count_df = final_df.select([count(when(col(c).isNull(),1)).alias(c) for c in final_df.columns])
+null_count_df.show()
